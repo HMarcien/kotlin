@@ -133,6 +133,7 @@ class KotlinMPPGradleModelBuilder : ModelBuilderService {
         val getConfigurationName = dependencyHolderClass.getMethodOrNull(configurationNameAccessor) ?: return emptyList()
         val configurationName = getConfigurationName(dependencyHolder) as? String ?: return emptyList()
         val configuration = project.configurations.findByName(configurationName) ?: return emptyList()
+        @Suppress("UnstableApiUsage")
         if (!configuration.isCanBeResolved) return emptyList()
 
         val dependencyAdjuster = DependencyAdjuster(configuration, scope, project)
@@ -178,13 +179,13 @@ class KotlinMPPGradleModelBuilder : ModelBuilderService {
         val platform = KotlinPlatform.byId(platformId) ?: return null
         val disambiguationClassifier = getDisambiguationClassifier(gradleTarget) as? String
         val getPreset = targetClass.getMethodOrNull("getPreset")
-        var targetPresetName: String?
-        try {
+        val targetPresetName: String?
+        targetPresetName = try {
             val targetPreset = getPreset?.invoke(gradleTarget)
             val getPresetName = targetPreset?.javaClass?.getMethodOrNull("getName")
-            targetPresetName = getPresetName?.invoke(targetPreset) as? String
+            getPresetName?.invoke(targetPreset) as? String
         } catch (e: Throwable) {
-            targetPresetName = "${e::class.java.name}:${e.message}"
+            "${e::class.java.name}:${e.message}"
         }
         @Suppress("UNCHECKED_CAST")
         val gradleCompilations =
@@ -300,6 +301,7 @@ class KotlinMPPGradleModelBuilder : ModelBuilderService {
         return (getCompileClasspath(compileKotlinTask) as? Collection<File>)?.map { it.path } ?: emptyList()
     }
 
+    @Suppress("UnstableApiUsage")
     private fun buildCompilationOutput(
         gradleCompilation: Named,
         compileKotlinTask: Task
@@ -359,6 +361,7 @@ class KotlinMPPGradleModelBuilder : ModelBuilderService {
         }
     }
 
+    @Suppress("UnstableApiUsage")
     private class DependencyAdjuster(
         private val configuration: Configuration,
         private val scope: String,
@@ -446,9 +449,3 @@ private fun Project.getChildProjectByPath(path: String): Project? {
     return project
 }
 
-private fun Project.getTargets(): Collection<Named>? {
-    val kotlinExt = project.extensions.findByName("kotlin") ?: return null
-    val getTargets = kotlinExt.javaClass.getMethodOrNull("getTargets") ?: return null
-    @Suppress("UNCHECKED_CAST")
-    return (getTargets.invoke(kotlinExt) as? NamedDomainObjectContainer<Named>)?.asMap?.values ?: emptyList()
-}

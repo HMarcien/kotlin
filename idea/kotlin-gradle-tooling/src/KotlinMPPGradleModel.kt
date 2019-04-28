@@ -9,18 +9,17 @@ import org.jetbrains.plugins.gradle.model.ExternalDependency
 import org.jetbrains.plugins.gradle.model.ModelFactory
 import java.io.File
 import java.io.Serializable
-import java.util.*
 
 typealias KotlinDependency = ExternalDependency
 
 fun KotlinDependency.deepCopy(cache: MutableMap<Any, Any>): KotlinDependency {
     val cachedValue = cache[this] as? KotlinDependency
-    if (cachedValue != null) {
-        return cachedValue
+    return if (cachedValue != null) {
+        cachedValue
     } else {
         val result = ModelFactory.createCopy(this)
         cache[this] = result
-        return result
+        result
     }
 }
 
@@ -40,8 +39,6 @@ interface KotlinSourceSet : KotlinModule {
     companion object {
         const val COMMON_MAIN_SOURCE_SET_NAME = "commonMain"
         const val COMMON_TEST_SOURCE_SET_NAME = "commonTest"
-
-        fun commonName(forTests: Boolean) = if (forTests) COMMON_TEST_SOURCE_SET_NAME else COMMON_MAIN_SOURCE_SET_NAME
     }
 }
 
