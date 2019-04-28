@@ -136,7 +136,9 @@ class KotlinMPPGradleModelBuilder : ModelBuilderService {
         @Suppress("UnstableApiUsage")
         if (!configuration.isCanBeResolved) return emptyList()
 
-        val dependencyAdjuster = DependencyAdjuster(configuration, scope, project)
+        val dependencyTransformations = buildMetadataDependencyTransformations(dependencyHolder, configurationName)//TODO
+
+        val dependencyAdjuster = DependencyAdjuster(configuration, scope, project/*, dependencyTransformations*/)
 
         val resolvedDependencies = dependencyResolver
             .resolveDependencies(configuration)
@@ -253,6 +255,38 @@ class KotlinMPPGradleModelBuilder : ModelBuilderService {
             this += sourceSetMap[compilationFullName(gradleCompilation.name, classifier)]?.dependencies ?: emptySet()
         }
     }
+
+    private class MetadataDependencyTransformationBuilder(val sourceSet: Any) {
+        val transformationsMethod = sourceSet.javaClass.getMethodOrNull("getDependenciesTransformation", String::class.java)
+
+        class KotlinMetadataDependencyTransformation(val groupId: String?, val moduleName: String, val projectPath: String?, val allVisibleSourceSets: Set<String>, val useFilesForSourceSets: Map<String, Iterable<File>>) {
+            constructor(transformations: Iterable<Any>, )
+        }
+
+        fun getTransformations(configurationName: String): Collection<KotlinMetadataDependencyTransformation> {
+            val transformations = transformationsMethod?.invoke(sourceSet, configurationName) as? Iterable<*> ?: return emptyList()
+            val transformationClass = transformations.firstOrNull()?.javaClass
+                ?: return emptyList()
+
+            val getGroupId = transformationClass.getMethodOrNull("getGroupId") ?: return emptyList()
+            val getModuleName = transformationClass.getMethodOrNull("getModuleName") ?: return emptyList()
+            val getProjectPath = transformationClass.getMethodOrNull("getProjectPath") ?: return emptyList()
+            val getAllVisibleSourceSets = transformationClass.getMethodOrNull("getAllVisibleSourceSets") ?: return emptyList()
+            val getUseFilesForSourceSets = transformationClass.getMethodOrNull("getUseFilesForSourceSets") ?: return emptyList()
+
+            return transformations.map { transformation ->
+                val groupId = getGroupId(transformation) as String?
+                val moduleName = getModuleName(transformation) as String
+                val projectPath = getProjectPath(transformation) as String?
+                @Suppress("UNCHECKED_CAST")
+                val allVisibleSourceSets = getAllVisibleSourceSets(transformation) as Set<String>
+                @Suppress("UNCHECKED_CAST")
+                val useSourceSetsForFiles = getUseFilesForSourceSets(transformation) as Map<String, Iterable<File>>
+                KotlinMetadataDependencyTransformationImpl(groupId, moduleName, projectPath, allVisibleSourceSets, useSourceSetsForFiles)
+            }
+        }
+    }
+
 
     private fun buildSourceSetDependencies(
         gradleSourceSet: Named,
